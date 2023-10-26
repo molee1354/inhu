@@ -1,0 +1,12 @@
+# directories
+.idea/
+.vscode/
+bin/
+obj/
+
+# files
+*.out
+*.cpp
+*.hpp
+!src/*.cpp
+!src/*.hpp
