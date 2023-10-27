@@ -1,5 +1,6 @@
 CXX = clang++
-CXXFLAGS = -Wall -g -O3 `llvm-config --cxxflags`
+CXXFLAGS = -Wall -g -O3
+CXXFLAGS += `llvm-config --cxxflags --ldflags --system-libs --libs core`
 
 SRC_DIR = src
 OBJ_DIR = obj

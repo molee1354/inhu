@@ -4,6 +4,11 @@
 #include "parser.hpp"
 
 /**
+ * @brief Function to initialize a new context and module
+ */
+void InitializeModule();
+
+/**
  * @brief Function to handle 'def'
  */
 void HandleDefinition();

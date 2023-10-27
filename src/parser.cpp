@@ -4,6 +4,8 @@
 #include <vector>
 #include "parser.hpp"
 
+using namespace llvm;
+
 /*
  * CurTok - the current token the parser is looking at
  * getNextToken() - reads another token from the lexer and updates
@@ -40,19 +42,6 @@ static int GetTokenPrecedence() {
     int TokenPrec = BinOpPrec[CurTok];
     if (TokenPrec <= 0) return -1;
     return TokenPrec;
-}
-
-/*
- * Helper functions for error handling
- */
-static std::unique_ptr<ExprAST> LogError(const char* msg) {
-    fprintf(stderr, "Error: %s\n", msg);
-    return nullptr;
-}
-
-static std::unique_ptr<PrototypeAST> LogErrorP(const char* msg) {
-    LogError(msg);
-    return nullptr;
 }
 
 std::unique_ptr<ExprAST> ParseNumberExpr() {

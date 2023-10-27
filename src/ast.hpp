@@ -1,9 +1,17 @@
 #ifndef my_ast_hpp
 #define my_ast_hpp
     
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "llvm_headers.hpp"
+
+extern std::unique_ptr<llvm::LLVMContext> TheContext;
+extern std::unique_ptr<llvm::Module> TheModule;
+extern std::unique_ptr<llvm::IRBuilder<>> Builder;
+extern std::map<std::string, llvm::Value*> NamedValues;
 
 /**
  * @class ExprAst
@@ -13,6 +21,7 @@
 class ExprAST{
 public:
     virtual ~ExprAST() = default;
+    virtual llvm::Value* codegen() = 0; // emit IR for that node
 };
 
 /**
@@ -24,6 +33,7 @@ class NumberExprAST : public ExprAST {
     double Val;
 public: 
     NumberExprAST(double Val);
+    llvm::Value* codegen() override;
 };
 
 /**
@@ -35,6 +45,7 @@ class VariableExprAST : public ExprAST {
     std::string Name;
 public:
     VariableExprAST(const std::string &Name);
+    llvm::Value* codegen() override;
 };
 
 /**
@@ -48,6 +59,7 @@ class BinaryExprAST : public ExprAST {
 public:
     BinaryExprAST(char Oper, std::unique_ptr<ExprAST> LHS,
                              std::unique_ptr<ExprAST> RHS);
+    llvm::Value* codegen() override;
 };
 
 /**
@@ -62,6 +74,7 @@ class CallExprAST : public ExprAST {
 public:
     CallExprAST(const std::string &Callee,
                 std::vector<std::unique_ptr<ExprAST>> Args);
+    llvm::Value* codegen() override;
 };
 
 /**
@@ -81,6 +94,7 @@ public:
      * the state of the object will not be changed by
      * calling this function. The function just gets the Name.
      */
+    llvm::Function* codegen();
     const std::string &getName() const;
 };
 
@@ -96,6 +110,28 @@ class FunctionAST {
 public:
     FunctionAST(std::unique_ptr<PrototypeAST> Proto,
                 std::unique_ptr<ExprAST> Body);
+    llvm::Function* codegen();
 };
+
+/**
+ * @brief Function to display log errors for expression nodes
+ *
+ * @param msg Error message
+ */
+std::unique_ptr<ExprAST> LogError(const char* msg);
+
+/**
+ * @brief Function to display log errors for Prototype nodes
+ *
+ * @param msg Error message
+ */
+std::unique_ptr<PrototypeAST> LogErrorP(const char* msg);
+
+/**
+ * @brief Function to log errors for Value nodes
+ *
+ * @param msg Error message
+ */
+llvm::Value* LogErrorV(const char* msg);
 
 #endif

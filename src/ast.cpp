@@ -1,5 +1,31 @@
 #include "ast.hpp"
 
+using namespace llvm;
+
+// Variables for LLVM code generation
+std::unique_ptr<LLVMContext> TheContext;
+std::unique_ptr<Module> TheModule;
+std::unique_ptr<IRBuilder<>> Builder;
+std::map<std::string, Value*> NamedValues;
+
+/*
+ * Helper functions for error handling
+ */
+std::unique_ptr<ExprAST> LogError(const char* msg) {
+    fprintf(stderr, "Error: %s\n", msg);
+    return nullptr;
+}
+
+std::unique_ptr<PrototypeAST> LogErrorP(const char* msg) {
+    LogError(msg);
+    return nullptr;
+}
+
+Value* LogErrorV(const char* msg) {
+    LogError(msg);
+    return nullptr;
+}
+
 /**
  * @brief NumberExprAST constructor definition
  *
@@ -9,12 +35,36 @@ NumberExprAST::NumberExprAST(double Val)
     : Val(Val) {}
 
 /**
+ * @brief NumberExprAST Codegen
+ *
+ * @return ConstantFP
+ */
+Value* NumberExprAST::codegen() {
+    /* APFloat(Val) --> can hold floating point constant
+     * arbitrary precision
+     */
+    return ConstantFP::get(*TheContext, APFloat(Val));
+}
+
+/**
  * @brief VariableExprAST constructor definition
  *
- * @param Name 
+ * @param Name
  */
 VariableExprAST::VariableExprAST(const std::string &Name)
     : Name(Name) {}
+
+/**
+ * @brief VariableExprAST codegen
+ *
+ * @return Value*
+ */
+Value* VariableExprAST::codegen() {
+    Value* V = NamedValues[Name];
+    if (!V)
+        return LogErrorV("Unknown variable name");
+    return V;
+}
 
 /**
  * @brief BinaryExprAST constructor definition
@@ -29,6 +79,37 @@ BinaryExprAST::BinaryExprAST(char Oper,
     : Oper(Oper) , LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
 /**
+ * @brief BinaryExprAST codegen definition
+ *
+ * @return Value*
+ */
+Value* BinaryExprAST::codegen() {
+    // recursively emit code for LHS and then RHS
+    Value* L = LHS->codegen();
+    Value* R = RHS->codegen();
+
+    if (!L || !R)
+        return nullptr;
+    
+    switch (Oper) {
+        case '+':
+            return Builder->CreateFAdd(L, R, "addtmp");
+        case '-':
+            return Builder->CreateFSub(L, R, "subtmp");
+        case '*':
+            return Builder->CreateFMul(L, R, "multmp");
+        case '/':
+            return Builder->CreateFDiv(L, R, "divtmp");
+        case '<':
+            L = Builder->CreateFCmpULT(L, R, "cmptmp");
+            return Builder->CreateUIToFP(L,
+                    Type::getDoubleTy(*TheContext), "booltmp");
+        default:
+            return LogErrorV("Invalid binary operator");
+    }
+}
+
+/**
  * @brief CallExprAST constructor definition
  *
  * @param Callee 
@@ -39,6 +120,29 @@ CallExprAST::CallExprAST(const std::string &Callee,
     : Callee(Callee), Args(std::move(Args)) {}
 
 /**
+ * @brief CallExprAST codegen
+ *
+ * @return Value*
+ */
+Value* CallExprAST::codegen() {
+    // look up name in global module table
+    Function* CalleeF = TheModule->getFunction(Callee);
+    if (!CalleeF)
+        return LogErrorV("Unknown function referred");
+
+    if (CalleeF->arg_size() != Args.size())
+        return LogErrorV("Incorrect number of arguments passed");
+
+    std::vector<Value*> ArgsV;
+    for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+        ArgsV.push_back(Args[i]->codegen());
+        if (!ArgsV.back())
+            return nullptr;
+    }
+    return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
+}
+
+/**
  * @brief PrototypeAST constructor definition
  *
  * @param Name 
@@ -47,6 +151,28 @@ CallExprAST::CallExprAST(const std::string &Callee,
 PrototypeAST::PrototypeAST(const std::string &Name,
                            std::vector<std::string> Args)
     : Name(Name) , Args(std::move(Args)) {}
+
+/**
+ * @brief PrototypeAST codegen
+ *
+ * @return Function*
+ */
+Function* PrototypeAST::codegen() {
+    // make function type: int(int, int) ...
+    std::vector<Type*> Doubles(Args.size(), Type::getDoubleTy(*TheContext));
+    FunctionType* FuncType = FunctionType::get(Type::getDoubleTy(*TheContext),
+                                               Doubles, false);
+    Function* Func = Function::Create(FuncType,
+                                      Function::ExternalLinkage,
+                                      Name, TheModule.get());
+
+    // set names for all arguments
+    unsigned Idx = 0;
+    for (auto &Arg : Func->args())
+        Arg.setName(Args[Idx++]);
+    
+    return Func;
+}
 
 /**
  * @brief Getting the name of the function prototype
@@ -66,3 +192,34 @@ FunctionAST::FunctionAST(std::unique_ptr<PrototypeAST> Proto,
                          std::unique_ptr<ExprAST> Body)
     : Proto(std::move(Proto)), Body(std::move(Body)) {}
 
+Function* FunctionAST::codegen() {
+    // check for existing function from a previous "extern" declaration
+    Function* TheFunction = TheModule->getFunction(Proto->getName());
+
+    if (!TheFunction)
+        TheFunction = Proto->codegen();
+    if (!TheFunction)
+        return nullptr;
+
+    // create a new basic block to start insertion into
+    BasicBlock* BBlock = BasicBlock::Create(*TheContext, "entry", TheFunction);
+    Builder->SetInsertPoint(BBlock);
+
+    // record the function arguments in the NamedValues map
+    NamedValues.clear();
+    for (auto &Arg : TheFunction->args())
+        NamedValues[std::string(Arg.getName())] = &Arg;
+
+    if (Value* RetVal = Body->codegen()) {
+        // finish function
+        Builder->CreateRet(RetVal);
+
+        // validate generated code
+        verifyFunction(*TheFunction);
+        return TheFunction;
+    }
+
+    // error case reading body -> remove function
+    TheFunction->eraseFromParent();
+    return nullptr;
+}
