@@ -8,6 +8,14 @@ std::unique_ptr<Module> TheModule;
 std::unique_ptr<IRBuilder<>> Builder;
 std::map<std::string, Value*> NamedValues;
 
+std::unique_ptr<llvm::FunctionPassManager> TheFPM;
+std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
+std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
+std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
+std::unique_ptr<llvm::StandardInstrumentations> TheSI;
+
+std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+
 /*
  * Helper functions for error handling
  */
@@ -23,6 +31,19 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char* msg) {
 
 Value* LogErrorV(const char* msg) {
     LogError(msg);
+    return nullptr;
+}
+
+static Function* getFunction(std::string Name) {
+    // see if function was added to current module
+    if (auto *F = TheModule->getFunction(Name))
+        return F;
+
+    // check if we can codegen decl from existing prototype
+    auto FI = FunctionProtos.find(Name);
+    if (FI != FunctionProtos.end())
+        return FI->second->codegen();
+
     return nullptr;
 }
 
@@ -126,7 +147,7 @@ CallExprAST::CallExprAST(const std::string &Callee,
  */
 Value* CallExprAST::codegen() {
     // look up name in global module table
-    Function* CalleeF = TheModule->getFunction(Callee);
+    Function* CalleeF = getFunction(Callee);
     if (!CalleeF)
         return LogErrorV("Unknown function referred");
 
@@ -193,11 +214,10 @@ FunctionAST::FunctionAST(std::unique_ptr<PrototypeAST> Proto,
     : Proto(std::move(Proto)), Body(std::move(Body)) {}
 
 Function* FunctionAST::codegen() {
-    // check for existing function from a previous "extern" declaration
-    Function* TheFunction = TheModule->getFunction(Proto->getName());
+    auto &P = *Proto;
+    FunctionProtos[Proto->getName()] = std::move(Proto);
+    Function* TheFunction = getFunction(P.getName());
 
-    if (!TheFunction)
-        TheFunction = Proto->codegen();
     if (!TheFunction)
         return nullptr;
 
@@ -216,6 +236,7 @@ Function* FunctionAST::codegen() {
 
         // validate generated code
         verifyFunction(*TheFunction);
+        TheFPM->run(*TheFunction, *TheFAM);
         return TheFunction;
     }
 

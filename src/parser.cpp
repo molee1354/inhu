@@ -14,6 +14,7 @@ using namespace llvm;
 int CurTok;
 extern double NumVal;
 
+
 int getNextToken() {
     return CurTok = gettok();
 }

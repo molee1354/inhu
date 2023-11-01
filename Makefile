@@ -1,6 +1,7 @@
 CXX = clang++
 CXXFLAGS = -Wall -g -O3
-CXXFLAGS += `llvm-config --cxxflags --ldflags --system-libs --libs core`
+CXXFLAGS += `llvm-config --cxxflags --ldflags --system-libs --libs core orcjit native`
+
 
 SRC_DIR = src
 OBJ_DIR = obj

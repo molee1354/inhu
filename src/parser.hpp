@@ -7,6 +7,8 @@
 
 extern int CurTok;
 extern std::map<char, int> BinOpPrec;
+extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+
 
 int getNextToken();
 /**

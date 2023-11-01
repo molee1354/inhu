@@ -2,11 +2,13 @@
 #define my_driver_hpp
 
 #include "parser.hpp"
+extern llvm::ExitOnError ExitOnErr;
+extern std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
 
 /**
  * @brief Function to initialize a new context and module
  */
-void InitializeModule();
+void InitializeModuleAndManagers();
 
 /**
  * @brief Function to handle 'def'
