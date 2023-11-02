@@ -43,6 +43,9 @@ void InitializeModuleAndManagers() {
     TheFAM->registerPass([&] {
             return OuterAnalysisManagerProxy<ModuleAnalysisManager, Function>(*TheMAM); 
     });
+    TheFAM->registerPass([&] {
+        return PassInstrumentationAnalysis(ThePIC.get());
+    });
     TheFAM->registerPass([&] {return TargetIRAnalysis(); });
     TheFAM->registerPass([&] {return TargetLibraryAnalysis(); });
     TheMAM->registerPass([&] {return ProfileSummaryAnalysis(); });
