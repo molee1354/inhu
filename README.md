@@ -2,6 +2,24 @@
 
 INHU is an LLVM language frontend that is implemented based on this [tutorial](https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html). Along with a simple, intuitive syntax INHU supports JIT compilation so that you can enjoy all the cool features of a compiled language *AND* have a REPL.
 
+## Table of Contents
+
+- [INHU](#inhu)
+  - [Table of Contents](#table-of-contents)
+  - [Features and Syntax](#features-and-syntax)
+    - [Syntax](#syntax)
+      - [Semicolons](#semicolons)
+      - [Functions](#functions)
+        - [Extern Functions](#extern-functions)
+      - [Conditionals](#conditionals)
+      - [Loops](#loops)
+    - [Unique Features](#unique-features)
+  - [Setup](#setup)
+    - [Downloading the Precompiled Binary](#downloading-the-precompiled-binary)
+    - [Building from Source](#building-from-source)
+      - [Building LLVM and Clang from Source](#building-llvm-and-clang-from-source)
+      - [Building INHU from Source](#building-inhu-from-source)
+
 ## Features and Syntax
 
 INHU has a simple and intuitive syntax that should be relatively easy and familiar.
