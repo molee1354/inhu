@@ -10,7 +10,7 @@ BIN_DIR = bin
 SRC_FILES := $(wildcard $(SRC_DIR)/*.cpp)
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRC_FILES))
 
-TARG = $(BIN_DIR)/main
+TARG = $(BIN_DIR)/inhu
 
 .PHONY: all clean
 

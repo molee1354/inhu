@@ -1,7 +1,6 @@
 # directories
 .idea/
 .vscode/
-bin/
 obj/
 
 # files
