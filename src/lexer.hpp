@@ -18,6 +18,9 @@ enum Token {
 
     token_for = -9,
     token_do = -10,
+
+    token_binary = -11,
+    token_unary = -12
 };
 
 extern std::string IdentifierStr;

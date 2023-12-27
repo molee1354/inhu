@@ -69,6 +69,19 @@ public:
 };
 
 /**
+ * @class UnaryExprAST
+ * @brief Expression class for unary operations
+ *
+ */
+class UnaryExprAST : public ExprAST {
+    char OpCode;
+    std::unique_ptr<ExprAST> Operand;
+public:
+    UnaryExprAST(char OpCode, std::unique_ptr<ExprAST> Operand);
+    llvm::Value* codegen() override;
+};
+
+/**
  * @class CallExprAST
  * @brief Expression class for function calls
  *
@@ -92,9 +105,12 @@ public:
 class PrototypeAST {
     std::string Name;
     std::vector<std::string> Args;
+    bool IsOperator;
+    unsigned Precedence;
 
 public:
-    PrototypeAST(const std::string &Name, std::vector<std::string> Args);
+    PrototypeAST(const std::string &Name, std::vector<std::string> Args,
+                 bool isOperator = false, unsigned Prec = 0);
 
     /* the 'const' after function name indicates that
      * the state of the object will not be changed by
@@ -102,6 +118,11 @@ public:
      */
     llvm::Function* codegen();
     const std::string &getName() const;
+
+    bool isUnaryOp() const;
+    bool isBinaryOp() const;
+    char getOperatorName() const;
+    unsigned getBinaryPrecedence() const;
 };
 
 /**

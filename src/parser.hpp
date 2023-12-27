@@ -51,6 +51,13 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
                                        std::unique_ptr<ExprAST> LHS);
 
 /**
+ * @brief Function to parse unary expressions
+ *
+ * @return ExprAST Node
+ */
+std::unique_ptr<ExprAST> ParseUnary();
+
+/**
  * @brief Function to parse function prototype
  *
  * @return PrototypeAST Node

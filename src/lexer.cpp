@@ -31,6 +31,10 @@ int gettok() {
             return token_for;
         if (IdentifierStr == "do")
             return token_do;
+        if (IdentifierStr == "binary")
+            return token_binary;
+        if (IdentifierStr == "unary")
+            return token_unary;
         return token_identifier;
     }
 

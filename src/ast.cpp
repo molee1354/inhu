@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "parser.hpp"
 #include <llvm/IR/Instructions.h>
 
 using namespace llvm;
@@ -127,8 +128,40 @@ Value* BinaryExprAST::codegen() {
             return Builder->CreateUIToFP(L,
                     Type::getDoubleTy(*TheContext), "booltmp");
         default:
-            return LogErrorV("Invalid binary operator");
+            break;
     }
+    // if not a builtin oper, then look for a user-defined one
+    Function *F = getFunction(std::string("binary") + Oper);
+    assert(F && "Binary Operator not found!");
+
+    Value* Ops[2] = {L, R};
+    return Builder->CreateCall(F, Ops, "binop");
+}
+
+/**
+ * @brief UnaryExprAST constructor definition
+ *
+ * @param OpCode 
+ * @param Operand 
+ */
+UnaryExprAST::UnaryExprAST(char OpCode, std::unique_ptr<ExprAST> Operand)
+    : OpCode(OpCode), Operand(std::move(Operand)) {}
+
+/**
+ * @brief Codegen implementation for UnarExprAST
+ *
+ * @return 
+ */
+Value* UnaryExprAST::codegen() {
+    Value* OperandV = Operand->codegen();
+    if (!OperandV)
+        return nullptr;
+
+    Function *F = getFunction(std::string("unary") + OpCode);
+    if (!F)
+        return LogErrorV("Unknown unary operator");
+
+    return Builder->CreateCall(F, OperandV, "unop");
 }
 
 /**
@@ -318,8 +351,11 @@ Value* ForExprAST::codegen() {
  * @param Args 
  */
 PrototypeAST::PrototypeAST(const std::string &Name,
-                           std::vector<std::string> Args)
-    : Name(Name) , Args(std::move(Args)) {}
+                           std::vector<std::string> Args,
+                           bool IsOperator,
+                           unsigned Prec)
+    : Name(Name) , Args(std::move(Args)),
+      IsOperator(IsOperator), Precedence(Prec) {}
 
 /**
  * @brief PrototypeAST codegen
@@ -351,6 +387,41 @@ Function* PrototypeAST::codegen() {
 const std::string &PrototypeAST::getName() const { return Name; }
 
 /**
+ * @brief Function to determine if an operator is unary
+ *
+ * @return bool True if operator is unary
+ */
+bool PrototypeAST::isUnaryOp() const {
+    return IsOperator && Args.size() == 1;
+}
+
+/**
+ * @brief Function to determine if an operator is binary
+ *
+ * @return bool True if operator is binary
+ */
+bool PrototypeAST::isBinaryOp() const {
+    return IsOperator && Args.size() == 2;
+}
+
+/**
+ * @brief Function to get the name of the operator
+ *
+ * @return char Character of operator
+ */
+char PrototypeAST::getOperatorName() const {
+    assert(isUnaryOp() || isBinaryOp());
+    return Name[Name.size()-1];
+}
+
+/**
+ * @brief Function to get the operator precedence
+ *
+ * @return unsigned Comparable number value of operator
+ */
+unsigned PrototypeAST::getBinaryPrecedence() const { return Precedence; }
+
+/**
  * @brief FunctionAST constructor definition
  *
  * @param PrototypeAST 
@@ -368,6 +439,10 @@ Function* FunctionAST::codegen() {
 
     if (!TheFunction)
         return nullptr;
+
+    // if binary operator, create precedence entry
+    if (P.isBinaryOp())
+        BinOpPrec[P.getOperatorName()] = P.getBinaryPrecedence();
 
     // create a new basic block to start insertion into
     BasicBlock* BBlock = BasicBlock::Create(*TheContext, "entry", TheFunction);
