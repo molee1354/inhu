@@ -91,4 +91,9 @@ std::unique_ptr<ExprAST> ParseExpression();
  */
 std::unique_ptr<ExprAST> ParseIfExpr();
 
+/**
+ * @brief Function to parse 'for' expressions
+ */
+std::unique_ptr<ExprAST> ParseForExpr();
+
 #endif

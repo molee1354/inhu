@@ -1,7 +1,7 @@
 CXX = clang++
 CXXFLAGS = -Wall -g -O3
 CXXFLAGS += `llvm-config --cxxflags --ldflags --system-libs --libs core orcjit native`
-
+CXXFLAGS += -Xlinker --export-dynamic
 
 SRC_DIR = src
 OBJ_DIR = obj

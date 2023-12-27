@@ -1,8 +1,10 @@
 #include <cctype>
 #include <cstdio>
+#include <llvm/ADT/StringExtras.h>
 #include <memory>
 #include <vector>
 #include "ast.hpp"
+#include "lexer.hpp"
 #include "parser.hpp"
 
 using namespace llvm;
@@ -111,6 +113,8 @@ std::unique_ptr<ExprAST> ParsePrimary() {
             return ParseParenExpr();
         case token_if:
             return ParseIfExpr();
+        case token_for:
+            return ParseForExpr();
     }
 }
 
@@ -201,6 +205,52 @@ std::unique_ptr<ExprAST> ParseIfExpr() {
         return nullptr;
     return std::make_unique<IfExprAST>(std::move(Cond), std::move(Then),
                                        std::move(Else));
+}
+
+std::unique_ptr<ExprAST> ParseForExpr() {
+    getNextToken(); // eat for
+    
+    if (CurTok != token_identifier)
+        return LogError("Expected identifier after 'for'");
+
+    std::string IdName = IdentifierStr;
+    getNextToken(); // get identifier
+    
+    if (CurTok != '=')
+        return LogError("Expected variable assignment in 'for' loop");
+    getNextToken();
+
+    auto Start = ParseExpression();
+    if (!Start)
+        return nullptr;
+    if (CurTok != ',')
+        return LogError("Expected ',' after 'for' loop variable");
+    getNextToken();
+
+    auto End = ParseExpression();
+    if (!End)
+        return nullptr;
+
+    // optional step value
+    std::unique_ptr<ExprAST> Step;
+    if (CurTok == ',') {
+        getNextToken();
+        Step = ParseExpression();
+        if (!Step)
+            return nullptr;
+    }
+
+    if (CurTok != token_do)
+        return LogError("Expected 'do' after 'for'");
+    getNextToken();
+
+    auto Body = ParseExpression();
+    if (!Body)
+        return nullptr;
+
+    return std::make_unique<ForExprAST>(IdName, std::move(Start),
+                                        std::move(End), std::move(Step),
+                                        std::move(Body));
 }
 
 std::unique_ptr<PrototypeAST> ParseExtern() {

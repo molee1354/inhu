@@ -135,6 +135,24 @@ public:
 };
 
 /**
+ * @class ForExprAST
+ * @brief Class to represent a 'for' loop expression
+ *
+ */
+class ForExprAST: public ExprAST {
+    std::string VarName;
+    std::unique_ptr<ExprAST> Start, End, Step, Body;
+
+public:
+    ForExprAST(const std::string &VarName,
+               std::unique_ptr<ExprAST> Start,
+               std::unique_ptr<ExprAST> End,
+               std::unique_ptr<ExprAST> Step,
+               std::unique_ptr<ExprAST> Body);
+    llvm::Value* codegen() override;
+};
+
+/**
  * @brief Function to display log errors for expression nodes
  *
  * @param msg Error message

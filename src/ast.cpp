@@ -164,32 +164,48 @@ Value* CallExprAST::codegen() {
     return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
+/**
+ * @brief 'If' expression constructor
+ *
+ * @param ExprAST 
+ * @param Cond 
+ * @param Then 
+ * @param Else 
+ */
+IfExprAST::IfExprAST(std::unique_ptr<ExprAST> Cond,
+              std::unique_ptr<ExprAST> Then,
+              std::unique_ptr<ExprAST> Else)
+    : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
+
+/**
+ * @brief 'If' expression codegen() implementation
+ *
+ * @return 
+ */
 Value* IfExprAST::codegen() {
     Value* CondV = Cond->codegen();
     if (!CondV)
         return nullptr;
 
-    // convert cond to bool by comparing neq to 0.0
     CondV = Builder->CreateFCmpONE(CondV,
-            ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
+                                   ConstantFP::get(*TheContext, APFloat(0.0)),
+                                   "ifcond");
     Function* TheFunction = Builder->GetInsertBlock()->getParent();
 
-    // creting block for 'then' and 'else' cases
-    BasicBlock *ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
-    BasicBlock *ElseBB = BasicBlock::Create(*TheContext, "else");
-    BasicBlock *MergeBB = BasicBlock::Create(*TheContext, "ifcont");
+    BasicBlock* ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
+    BasicBlock* ElseBB = BasicBlock::Create(*TheContext, "else");
+    BasicBlock* MergeBB = BasicBlock::Create(*TheContext, "ifcont");
 
     Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+
+    Builder->SetInsertPoint(ThenBB);
     Value* ThenV = Then->codegen();
-    if(!ThenV)
+    if (!ThenV)
         return nullptr;
 
     Builder->CreateBr(MergeBB);
-
-    // then block
     ThenBB = Builder->GetInsertBlock();
 
-    // emit else block
     TheFunction->insert(TheFunction->end(), ElseBB);
     Builder->SetInsertPoint(ElseBB);
 
@@ -198,20 +214,103 @@ Value* IfExprAST::codegen() {
         return nullptr;
 
     Builder->CreateBr(MergeBB);
-
-    // else block
     ElseBB = Builder->GetInsertBlock();
 
-    // emit merge block
     TheFunction->insert(TheFunction->end(), MergeBB);
     Builder->SetInsertPoint(MergeBB);
     PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
-
-    PN->addIncoming(ThenV, ThenBB);
-    PN->addIncoming(ElseV, ElseBB);
+    PN->addIncoming(ThenV,ThenBB);
+    PN->addIncoming(ElseV,ElseBB);
     return PN;
 }
 
+/**
+ * @brief 'for' expression constructor
+ *
+ * @param VarName 
+ * @param Start 
+ * @param End 
+ * @param Step 
+ * @param Body 
+ */
+ForExprAST::ForExprAST(const std::string &VarName,
+                       std::unique_ptr<ExprAST> Start,
+                       std::unique_ptr<ExprAST> End,
+                       std::unique_ptr<ExprAST> Step,
+                       std::unique_ptr<ExprAST> Body)
+    : VarName(VarName), Start(std::move(Start)), End(std::move(End)),
+      Step(std::move(Step)), Body(std::move(Body)) {}
+
+Value* ForExprAST::codegen() {
+    Value* StartVal = Start->codegen();
+    if (!StartVal)
+        return nullptr;
+
+    // create new basic block for loop header
+    Function* TheFunction = Builder->GetInsertBlock()->getParent();
+    BasicBlock* PreheaderBB = Builder->GetInsertBlock();
+    BasicBlock* LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
+
+    // set explicit fallthrough from current block to the loopBB
+    Builder->CreateBr(LoopBB);
+    Builder->SetInsertPoint(LoopBB);
+
+    // PHI node
+    PHINode* Variable = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, VarName);
+    Variable->addIncoming(StartVal, PreheaderBB);
+
+    // variable == phi node in the loop. If loop variable is already an existing
+    // variable, save it to 'OldVal'
+    Value* OldVal = NamedValues[VarName];
+    NamedValues[VarName] = Variable;
+
+    // emit loop body
+    if (!Body->codegen()) 
+        return nullptr;
+
+    // emit step value
+    Value* StepVal = nullptr;
+    if (Step) {
+        StepVal = Step->codegen();
+        if (!StepVal)
+            return nullptr;
+    } else {
+        StepVal = ConstantFP::get(*TheContext, APFloat(1.0));
+    }
+
+    Value* NextVar = Builder->CreateFAdd(Variable, StepVal, "nextvar");
+
+    // computing the end condition
+    Value* EndCond = End->codegen();
+    if (!EndCond)
+        return nullptr;
+
+    // convert cond to bool by comparing neq to 0.0
+    EndCond = Builder->CreateFCmpONE(
+            EndCond, ConstantFP::get(*TheContext, APFloat(0.0)), "loopcond");
+    
+    // creating an 'after loop' block and inserting it
+    BasicBlock* LoopEndBB = Builder->GetInsertBlock();
+    BasicBlock* AfterBB =
+        BasicBlock::Create(*TheContext, "afterloop", TheFunction);
+
+    // insert conditional branch into the end of LoopEndBB
+    Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
+
+    // setting insert point @ AfterBB s.t. new code will be inserted there
+    Builder->SetInsertPoint(AfterBB);
+
+    Variable->addIncoming(NextVar, LoopEndBB);
+
+    // restore 'OldVar'
+    if (OldVal)
+        NamedValues[VarName] = OldVal;
+    else
+        NamedValues.erase(VarName);
+
+    // for expr always returns 0.0
+    return Constant::getNullValue(Type::getDoubleTy(*TheContext));
+}
 /**
  * @brief PrototypeAST constructor definition
  *
@@ -293,51 +392,3 @@ Function* FunctionAST::codegen() {
     TheFunction->eraseFromParent();
     return nullptr;
 }
-
-IfExprAST::IfExprAST(std::unique_ptr<ExprAST> Cond,
-              std::unique_ptr<ExprAST> Then,
-              std::unique_ptr<ExprAST> Else)
-    : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
-
-Value* IfExprAST::codegen() {
-    Value* CondV = Cond->codegen();
-    if (!CondV)
-        return nullptr;
-
-    CondV = Builder->CreateFCmpONE(CondV,
-                                   ConstantFP::get(*TheContext, APFloat(0.0)),
-                                   "ifcond");
-    Function* TheFunction = Builder->GetInsertBlock()->getParent();
-
-    BasicBlock* ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
-    BasicBlock* ElseBB = BasicBlock::Create(*TheContext, "else");
-    BasicBlock* MergeBB = BasicBlock::Create(*TheContext, "ifcont");
-
-    Builder->CreateCondBr(CondV, ThenBB, ElseBB);
-
-    Builder->SetInsertPoint(ThenBB);
-    Value* ThenV = Then->codegen();
-    if (!ThenV)
-        return nullptr;
-
-    Builder->CreateBr(MergeBB);
-    ThenBB = Builder->GetInsertBlock();
-
-    TheFunction->insert(TheFunction->end(), ElseBB);
-    Builder->SetInsertPoint(ElseBB);
-
-    Value* ElseV = Else->codegen();
-    if (!ElseV)
-        return nullptr;
-
-    Builder->CreateBr(MergeBB);
-    ElseBB = Builder->GetInsertBlock();
-
-    TheFunction->insert(TheFunction->end(), MergeBB);
-    Builder->SetInsertPoint(MergeBB);
-    PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
-    PN->addIncoming(ThenV,ThenBB);
-    PN->addIncoming(ElseV,ElseBB);
-    return PN;
-}
-
