@@ -4,11 +4,11 @@
 #include "lexer.hpp"
 #include "ast.hpp"
 #include <map>
+#include <memory>
 
 extern int CurTok;
 extern std::map<char, int> BinOpPrec;
 extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
-
 
 int getNextToken();
 /**
@@ -85,5 +85,10 @@ std::unique_ptr<FunctionAST> ParseTopLevelExpr();
  * @return 
  */
 std::unique_ptr<ExprAST> ParseExpression();
+
+/**
+ * @brief Function to parse an 'if', 'then', 'else' expression
+ */
+std::unique_ptr<ExprAST> ParseIfExpr();
 
 #endif

@@ -17,12 +17,20 @@ int gettok() {
         while ( isalnum(( LastChar = getchar() )) )
             IdentifierStr += LastChar;
         
-        if (IdentifierStr == "def") {
+        if (IdentifierStr == "def")
             return token_def;
-        }
-        if (IdentifierStr == "extern") {
+        if (IdentifierStr == "extern")
             return token_extern;
-        }
+        if (IdentifierStr == "if")
+            return token_if;
+        if (IdentifierStr == "then")
+            return token_then;
+        if (IdentifierStr == "else")
+            return token_else;
+        if (IdentifierStr == "for")
+            return token_for;
+        if (IdentifierStr == "do")
+            return token_do;
         return token_identifier;
     }
 

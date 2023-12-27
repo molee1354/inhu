@@ -19,7 +19,6 @@ extern std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
 extern std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
 extern std::unique_ptr<llvm::StandardInstrumentations> TheSI;
 
-
 /**
  * @class ExprAst
  * @brief Base class for all expression nodes
@@ -118,6 +117,21 @@ public:
     FunctionAST(std::unique_ptr<PrototypeAST> Proto,
                 std::unique_ptr<ExprAST> Body);
     llvm::Function* codegen();
+};
+
+/**
+ * @class IfExprAST
+ * @brief Class to represent a 'if' conditional expression
+ *
+ */
+class IfExprAST: public ExprAST {
+    std::unique_ptr<ExprAST> Cond, Then, Else;
+public:
+    IfExprAST(std::unique_ptr<ExprAST> Cond,
+              std::unique_ptr<ExprAST> Then,
+              std::unique_ptr<ExprAST> Else);
+
+    llvm::Value* codegen() override;
 };
 
 /**

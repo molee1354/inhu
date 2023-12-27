@@ -11,6 +11,13 @@ enum Token {
 
     token_identifier = -4,
     token_number = -5,
+
+    token_if = -6,
+    token_then = -7,
+    token_else = -8,
+
+    token_for = -9,
+    token_do = -10,
 };
 
 extern std::string IdentifierStr;

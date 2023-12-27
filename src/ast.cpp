@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include <llvm/IR/Instructions.h>
 
 using namespace llvm;
 
@@ -163,6 +164,54 @@ Value* CallExprAST::codegen() {
     return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
+Value* IfExprAST::codegen() {
+    Value* CondV = Cond->codegen();
+    if (!CondV)
+        return nullptr;
+
+    // convert cond to bool by comparing neq to 0.0
+    CondV = Builder->CreateFCmpONE(CondV,
+            ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
+    Function* TheFunction = Builder->GetInsertBlock()->getParent();
+
+    // creting block for 'then' and 'else' cases
+    BasicBlock *ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
+    BasicBlock *ElseBB = BasicBlock::Create(*TheContext, "else");
+    BasicBlock *MergeBB = BasicBlock::Create(*TheContext, "ifcont");
+
+    Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+    Value* ThenV = Then->codegen();
+    if(!ThenV)
+        return nullptr;
+
+    Builder->CreateBr(MergeBB);
+
+    // then block
+    ThenBB = Builder->GetInsertBlock();
+
+    // emit else block
+    TheFunction->insert(TheFunction->end(), ElseBB);
+    Builder->SetInsertPoint(ElseBB);
+
+    Value* ElseV = Else->codegen();
+    if (!ElseV)
+        return nullptr;
+
+    Builder->CreateBr(MergeBB);
+
+    // else block
+    ElseBB = Builder->GetInsertBlock();
+
+    // emit merge block
+    TheFunction->insert(TheFunction->end(), MergeBB);
+    Builder->SetInsertPoint(MergeBB);
+    PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
+
+    PN->addIncoming(ThenV, ThenBB);
+    PN->addIncoming(ElseV, ElseBB);
+    return PN;
+}
+
 /**
  * @brief PrototypeAST constructor definition
  *
@@ -244,3 +293,51 @@ Function* FunctionAST::codegen() {
     TheFunction->eraseFromParent();
     return nullptr;
 }
+
+IfExprAST::IfExprAST(std::unique_ptr<ExprAST> Cond,
+              std::unique_ptr<ExprAST> Then,
+              std::unique_ptr<ExprAST> Else)
+    : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
+
+Value* IfExprAST::codegen() {
+    Value* CondV = Cond->codegen();
+    if (!CondV)
+        return nullptr;
+
+    CondV = Builder->CreateFCmpONE(CondV,
+                                   ConstantFP::get(*TheContext, APFloat(0.0)),
+                                   "ifcond");
+    Function* TheFunction = Builder->GetInsertBlock()->getParent();
+
+    BasicBlock* ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
+    BasicBlock* ElseBB = BasicBlock::Create(*TheContext, "else");
+    BasicBlock* MergeBB = BasicBlock::Create(*TheContext, "ifcont");
+
+    Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+
+    Builder->SetInsertPoint(ThenBB);
+    Value* ThenV = Then->codegen();
+    if (!ThenV)
+        return nullptr;
+
+    Builder->CreateBr(MergeBB);
+    ThenBB = Builder->GetInsertBlock();
+
+    TheFunction->insert(TheFunction->end(), ElseBB);
+    Builder->SetInsertPoint(ElseBB);
+
+    Value* ElseV = Else->codegen();
+    if (!ElseV)
+        return nullptr;
+
+    Builder->CreateBr(MergeBB);
+    ElseBB = Builder->GetInsertBlock();
+
+    TheFunction->insert(TheFunction->end(), MergeBB);
+    Builder->SetInsertPoint(MergeBB);
+    PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
+    PN->addIncoming(ThenV,ThenBB);
+    PN->addIncoming(ElseV,ElseBB);
+    return PN;
+}
+

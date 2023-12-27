@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <memory>
 #include <vector>
+#include "ast.hpp"
 #include "parser.hpp"
 
 using namespace llvm;
@@ -108,6 +109,8 @@ std::unique_ptr<ExprAST> ParsePrimary() {
             return ParseNumberExpr();
         case '(':
             return ParseParenExpr();
+        case token_if:
+            return ParseIfExpr();
     }
 }
 
@@ -173,6 +176,31 @@ std::unique_ptr<FunctionAST> ParseDefinition() {
     if (auto E = ParseExpression())
         return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
     return nullptr;
+}
+
+std::unique_ptr<ExprAST> ParseIfExpr() {
+    getNextToken();
+    auto Cond = ParseExpression();
+    if (!Cond)
+        return nullptr;
+
+    if (CurTok != token_then)
+        return LogError("Expected 'then'");
+    getNextToken();
+
+    auto Then = ParseExpression();
+    if (!Then)
+        return nullptr;
+
+    if (CurTok != token_else)
+        return LogError("Expected 'else'");
+
+    getNextToken();
+    auto Else = ParseExpression();
+    if (!Else)
+        return nullptr;
+    return std::make_unique<IfExprAST>(std::move(Cond), std::move(Then),
+                                       std::move(Else));
 }
 
 std::unique_ptr<PrototypeAST> ParseExtern() {
