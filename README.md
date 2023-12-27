@@ -185,8 +185,26 @@ More details on how to do this can be found [here](https://clang.llvm.org/get_st
     ```
 
     to build with multiple cores.
+  - After building LLVM is done (this should take quite a while), you can build Clang by running:
 
-This should take quite a while, but once that is done, you should be ready to build INHU from source.
+    ```shell
+    make clang
+    ```
+
+  - Finally, you should add the newly built LLVM and Clang to your system `$PATH`
+
+    ```shell
+    export PATH=$PATH:$(pwd)/bin
+    ```
+
+    This is assuming that you are still in the `build` directory. You should replace the example path with whatever directory that holds the LLVM and Clang binaries.
+  - Once that is done, check the LLVM version by running
+
+    ```shell
+    llvm-config --version
+    ```
+
+    Make sure that you are using versions **17** and onwards for INHU. Once that is done, you should be ready to build INHU.
 
 #### Building INHU from Source
 
