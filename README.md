@@ -26,7 +26,7 @@ INHU does not have a `return` keyword. Instead, the expression bottommost line (
 
 ##### Extern Functions
 
-You can call standard library functions by declaring them using the `extern` keyword. 
+You can call standard library functions by declaring them using the `extern` keyword.
 
 ```python
 extern sin(theta);
@@ -121,7 +121,9 @@ Setting up INHU on your machine is simple.
 
 ### Downloading the Precompiled Binary
 
-You can download the precompiled binary [here](). There isn't a Windows executable at the moment because I've yet to overcome some skill issues when it comes to C++. It should come in due time.
+You can download the precompiled binary [here](https://raw.githubusercontent.com/molee1354/inhu/master/bin/inhu).
+
+There isn't a Windows executable at the moment because I've yet to overcome some skill issues when it comes to C++. It should come in due time.
 
 ### Building from Source
 
