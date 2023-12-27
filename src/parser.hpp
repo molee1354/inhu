@@ -62,7 +62,7 @@ std::unique_ptr<ExprAST> ParseUnary();
  *
  * @return PrototypeAST Node
  */
-std::unique_ptr<PrototypeAST> ParsePrototype();
+std::unique_ptr<PrototypeAST> ParsePrototype(bool isExtern);
 
 /**
  * @brief Function to parse a function definition

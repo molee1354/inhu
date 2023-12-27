@@ -164,7 +164,7 @@ std::unique_ptr<ExprAST> ParseUnary() {
     return nullptr;
 }
 
-std::unique_ptr<PrototypeAST> ParsePrototype() {
+std::unique_ptr<PrototypeAST> ParsePrototype(bool isExtern) {
     std::string FnName;
 
     unsigned Kind = 0; // 0 -> identifier, 1 -> unary, 2 -> binary
@@ -179,30 +179,50 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
             getNextToken();
             break;
         case token_unary:
+            int UnaryToken;
+            getNextToken();
+            if (CurTok != '{')
+                return LogErrorP("Expected opening '{' for unary definitions");
             getNextToken();
             if (!isascii(CurTok))
                 return LogErrorP("Expected unary operator");
+            else
+                UnaryToken = CurTok;
+            getNextToken();
+            if (CurTok != '}')
+                return LogErrorP("Expected closing '}' for unary definitions");
             FnName = "unary";
-            FnName += (char)CurTok;
+            FnName += (char)UnaryToken;
             Kind = 1;
             getNextToken();
             break;
         case token_binary:
+            int BinaryToken;
+            getNextToken();
+            if (CurTok != '{')
+                return LogErrorP("Expected opening '{' for binary definitions");
             getNextToken();
             if (!isascii(CurTok))
                 return LogErrorP("Expected binary operator");
-            FnName = "binary";
-            FnName += (char)CurTok;
-            Kind = 2;
+            else
+                BinaryToken = CurTok;
             getNextToken();
-
-            // reading precedence if present
-            if (CurTok == token_number) {
+            if (CurTok == ':') {
+                getNextToken();
+                if (CurTok != token_number)
+                    return LogErrorP("Expected precdence number after ':'");
                 if (NumVal < 1 || NumVal > 100)
                     return LogErrorP("Invalid Precedence: precedence must be between 1 and 100");
                 BinaryPrecedence = (unsigned)NumVal;
                 getNextToken();
             }
+            if (CurTok != '}')
+                return LogErrorP("Expected closing '}' for binary definitions");
+            FnName = "binary";
+            FnName += (char)BinaryToken;
+            Kind = 2;
+            getNextToken();
+
             break;
     }
 
@@ -211,12 +231,28 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
 
     // read argsname list
     std::vector<std::string> ArgNames;
-    while (getNextToken() == token_identifier)
+    /* while (getNextToken() == token_identifier) {
         ArgNames.push_back(IdentifierStr);
+    } */
+    if (CurTok != ')') {
+        do {
+            getNextToken();
+            ArgNames.push_back(IdentifierStr);
+        } while (getNextToken() == ',');
+    }
+
     if (CurTok != ')')
         return LogErrorP("Expected ')' in prototype");
+
     // success
     getNextToken(); // eat ')'
+
+    if (!isExtern) {
+        if (CurTok != token_as) {
+            return LogErrorP("Expected 'as' after prototype");
+        }
+        getNextToken(); // eat 'as'
+    }
 
     // verify right number of names for oper
     if (Kind && ArgNames.size() != Kind)
@@ -228,7 +264,7 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
 
 std::unique_ptr<FunctionAST> ParseDefinition() {
     getNextToken(); // eat function keyword
-    auto Proto = ParsePrototype();
+    auto Proto = ParsePrototype(false);
     if (!Proto)
         return nullptr;
 
@@ -310,7 +346,7 @@ std::unique_ptr<ExprAST> ParseForExpr() {
 
 std::unique_ptr<PrototypeAST> ParseExtern() {
     getNextToken(); // just eat token
-    return ParsePrototype();
+    return ParsePrototype(true);
 }
 
 std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
